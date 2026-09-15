@@ -53,7 +53,7 @@ export default {
       const message = '今天的AI领域新闻有哪些';
       const response = await fetch('https://api.coze.cn/v1/workflows/chat', {
         method: 'POST',
-        redirect: 'error',
+        redirect: 'manual',
         signal: abort.signal,
         headers: { Authorization: `Bearer ${env.COZE_API_TOKEN}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
