@@ -67,38 +67,15 @@ const ChatInterface = () => {
       timestamp: new Date().toLocaleTimeString()
     };
 
-    // 如果没有当前对话，创建一个新的
-    if (!currentConversation) {
-      try {
-        console.log('创建新对话...');
-        const newConversation = await createConversation();
-        console.log('新对话创建成功:', newConversation.id);
-        
-        // 等待状态更新 - 增加等待时间并检查状态
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // 再次检查当前对话是否已设置
-        console.log('等待后检查当前对话:', currentConversation?.id);
-        
-        // 直接添加到新创建的对话中
-        addMessage(userMessage);
-        console.log('用户消息已添加');
-      } catch (error) {
-        console.error('创建对话失败:', error);
-        return;
-      }
-    } else {
-      // 添加用户消息到对话
-      console.log('添加到现有对话:', currentConversation.id);
-      addMessage(userMessage);
-    }
-    
+    // Capture the destination so switching chats during a request cannot misroute the reply.
+    let targetId = currentConversation?.id;
     setInputMessage('');
     setIsLoadingMessage(true);
-
     try {
-      const response = await chatWithNewsAssistant(inputMessage);
-      
+      if (!targetId) targetId = (await createConversation()).id;
+      addMessage(userMessage, targetId);
+      const response = await chatWithNewsAssistant(userMessage.content, messages);
+
       const botMessage = {
         id: Date.now() + 1,
         content: response?.content || response?.message || response?.data?.content || '抱歉，我暂时无法回答您的问题。',
@@ -108,7 +85,7 @@ const ChatInterface = () => {
 
       // 添加AI回复到对话
       console.log('添加AI回复');
-      addMessage(botMessage);
+      addMessage(botMessage, targetId);
     } catch (error) {
       console.error('聊天错误:', error);
       let errorContent = '抱歉，发生了错误，请稍后重试。';
@@ -127,7 +104,7 @@ const ChatInterface = () => {
         timestamp: new Date().toLocaleTimeString(),
         isError: true
       };
-      addMessage(errorMessage);
+      addMessage(errorMessage, targetId);
     } finally {
       setIsLoadingMessage(false);
     }
@@ -160,14 +137,14 @@ const ChatInterface = () => {
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900">欢迎使用AI新闻助手</h2>
                 <p className="text-gray-600 leading-relaxed">
-                  我是您的智能新闻助手，可以为您提供最新的新闻资讯、热点话题分析和深度解读。
+                  我是您的智能新闻助手，可以为您提供AI新闻速览，结合新闻原文解答追问，也可以简单聊聊。
                 </p>
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <p className="text-sm text-gray-700 mb-2 font-medium">您可以这样问我：</p>
                   <ul className="text-sm text-gray-600 space-y-1 text-left">
                     <li>• "今天有什么重要AI新闻？"</li>
                     <li>• "请介绍一下AI领域的最新发展"</li>
-                    <li>• "有什么有趣的科技新闻？"</li>
+                    <li>• "这条新闻中的技术有什么意义？"</li>
                   </ul>
                 </div>
               </div>
@@ -296,6 +273,7 @@ const ChatInterface = () => {
           <div className="flex gap-2 items-end">
             <div className="flex-1">
               <textarea
+                maxLength={2000}
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
@@ -333,10 +311,10 @@ const ChatInterface = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
             <div className="text-center text-gray-600">
               <p className="text-xs">
-                © 2025 AI新闻助手. 由Coze AI提供音频技术支持. Designed by Suy.
+                © {new Date().getFullYear()} AI新闻助手 · Designed by Suy.
               </p>
               <p className="text-xs mt-0.5 text-gray-500">
-                智能新闻对话 | 每日播客播报 | 让AI为您解读天下事
+                AI新闻速览 | 原文追问 | 每日资讯
               </p>
             </div>
           </div>

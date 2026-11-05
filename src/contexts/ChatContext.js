@@ -153,11 +153,11 @@ export const ChatProvider = ({ children }) => {
   }, [conversations, saveToStorage]);
 
   // 添加消息到当前对话
-  const addMessage = useCallback((message) => {
+  const addMessage = useCallback((message, conversationId = null) => {
     console.log('ChatContext: 添加消息到对话:', currentConversationId, '消息内容:', message.content.substring(0, 20) + '...');
     
     // 如果currentConversationId为null，尝试从localStorage获取
-    let targetConversationId = currentConversationId;
+    let targetConversationId = conversationId || currentConversationId;
     if (!targetConversationId) {
       const savedCurrentId = localStorage.getItem(CURRENT_CONVERSATION_KEY);
       if (savedCurrentId) {
