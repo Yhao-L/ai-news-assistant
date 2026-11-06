@@ -33,3 +33,9 @@ node --test scheduled-worker/worker.test.mjs
 ```
 
 在仓库根目录执行；测试不调用真实 Coze 接口。
+
+## 已迁移至 DeepSeek
+
+2026-11-06 已关闭此 Coze Worker 的定时触发。新任务位于
+`Yhao-L/aibase_news_rss/worker`，Cloudflare 服务名为 `ai-news-service`，
+每天北京时间 12:00 生成并发送飞书日报。此目录仅保留历史实现用于回滚，勿同时启用两套 Cron。

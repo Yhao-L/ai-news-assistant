@@ -16,3 +16,10 @@ REACT_APP_API_BASE_URL=http://localhost:8787 npm start
 用户切换对话后，异步回复仍写回发起请求的原对话。
 
 本地验证：API 单元测试两项通过，生产构建通过。真实 DeepSeek 回复需配置后端密钥后单独验证。
+
+## 2026-11-06 切换验证
+
+新 Cloudflare Worker 与 Secrets 已部署；生产服务已成功读取 11 篇新闻，
+生成今日日报、回答上下文追问，并确认飞书发送成功。模型固定使用 `deepseek-flash`。
+新服务 Cron 为北京时间每天12:00；旧 Coze Cron 已关闭。
+首个自动运行仍需在下一次计划时间后核对日志，手工联调不等于已验证自动运行。

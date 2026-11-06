@@ -2,6 +2,10 @@
   "name": "ai-news-scheduler",
   "main": "worker.mjs",
   "compatibility_date": "2026-09-09",
-  "observability": { "enabled": true },
-  "triggers": { "crons": ["0 4 * * *"] }
+  "observability": {
+    "enabled": true
+  },
+  "triggers": {
+    "crons": []
+  }
 }
