@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { API_CONFIG } from '../config/api';
 
-const apiClient = axios.create({baseURL:API_CONFIG.BASE_URL,timeout:150000,headers:{'Content-Type':'application/json'}});
+const apiClient = axios.create({baseURL:API_CONFIG.BASE_URL,timeout:180000,headers:{'Content-Type':'application/json'}});
 
 export const chatWithNewsAssistant = async (message, messages = []) => {
   const history = [];
