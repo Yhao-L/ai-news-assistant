@@ -1,167 +1,217 @@
 # AI 新闻助手
 
-一个面向 AI 从业者与资讯关注者的智能新闻 Web 应用：通过对话、每日播客和新闻摘要，帮助用户更高效地获取与理解 AI 行业动态。
+面向 AI 从业者的新闻阅读与对话应用：从 RSS 全文中筛选每日资讯，用 DeepSeek 生成分级摘要，支持围绕新闻继续追问，并在每天北京时间 12:00 将日报推送到飞书。
 
 [![在线体验](https://img.shields.io/badge/在线体验-GitHub%20Pages-2ea44f?logo=github)](https://yhao-l.github.io/ai-news-assistant/)
 [![部署状态](https://github.com/Yhao-L/ai-news-assistant/actions/workflows/deploy.yml/badge.svg)](https://github.com/Yhao-L/ai-news-assistant/actions/workflows/deploy.yml)
 [![React 18](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> 在线体验：[https://yhao-l.github.io/ai-news-assistant/](https://yhao-l.github.io/ai-news-assistant/)
+**[打开在线应用](https://yhao-l.github.io/ai-news-assistant/)** · **[RSS 与后端源码](https://github.com/Yhao-L/aibase_news_rss)** · **[后端部署说明](https://github.com/Yhao-L/aibase_news_rss/tree/main/worker)**
 
-## 项目背景
+> 当前版本已迁移到 RSS + DeepSeek + Cloudflare Workers，模型统一使用 `deepseek-flash`。线上入口不再依赖 Coze；历史播客与旧推送页面已退出当前产品入口。
 
-AI 产品经理和行业从业者每天需要浏览多个平台来追踪热点，信息来源分散、筛选成本较高。本项目通过 Coze 工作流聚合和处理资讯，并以对话、播客和摘要三种方式呈现，帮助用户快速把握重点。
+## 产品逻辑
 
-## 核心功能
+AI 新闻更新频繁，逐条阅读和判断价值需要时间。本项目把“获取资讯、筛选重点、理解新闻、定时送达”串成一条流程，同时提供两个使用入口：
 
-| 功能 | 说明 |
+| 入口 | 用户体验 |
 | --- | --- |
-| AI 新闻对话 | 支持自然语言提问、上下文对话、Markdown 回复与历史记录管理 |
-| AI 每日播客 | 生成每日精选新闻内容和音频，内置播放、音量与进度控制 |
-| 每日新闻推送 | 一键生成当日 AI 新闻摘要，支持 Markdown 排版和重新生成 |
-| 响应式界面 | 适配桌面端、平板和移动设备 |
+| 网页对话 | 查询每日新闻、阅读带原文链接的摘要，围绕技术名词、事件与影响继续追问，也支持简单聊天 |
+| 飞书日报 | 每天北京时间 12:00 自动发送交互卡片，不需要打开网页或保持本地电脑运行 |
 
-## 界面预览
+两个入口复用同一套日报生成服务。网页聊天不会触发飞书发送，当天首次生成的日报会缓存复用。
 
-<p align="center">
-  <img width="880" alt="AI 新闻助手对话页面" src="https://github.com/user-attachments/assets/bc3cf8e7-a84e-405c-8daa-21ab99a644ca" />
-</p>
+可以在网页中尝试：
 
-<p align="center">
-  <img width="820" alt="AI 新闻助手播客页面" src="https://github.com/user-attachments/assets/c745133f-d256-47cf-9393-4a9fe4e96793" />
-</p>
+- “今天有什么重要 AI 新闻？”
+- “第一条新闻里的 MoE 是什么意思？”
+- “这项技术对产品开发有什么影响？”
 
-### 视频演示
+## 核心能力
 
-https://github.com/user-attachments/assets/b4015c46-34ae-4287-a4ee-67bed49a3349
+- **全文新闻处理**：从 [AIbase RSS](https://yhao-l.github.io/aibase_news_rss/feed.xml) 读取完整正文，过滤最近 24 小时文章并去重。
+- **分级筛选与总结**：按配置的提示词筛选技术进展、模型发布及应用等资讯，输出“高优关注”和“要闻速览”，保留原文链接与推荐指数。
+- **输出校验**：检查链接来源、重复条目、分数分组、条数及摘要长度；格式不合格时最多修订两次，仍不合格则报错。
+- **上下文追问**：结合新闻材料与近期对话回答问题；支持 Markdown、对话切换与浏览器本地历史记录。
+- **定时卡片推送**：Cloudflare Cron 触发飞书 Card JSON 2.0 推送；记录发送状态，同日成功后不重复发送。
+- **后端密钥管理**：DeepSeek Key、飞书 Webhook 和管理令牌保存在 Cloudflare Secrets；前端只配置公开服务地址。
 
-## 工作原理
+日报的“高优关注”为 9.5 分及以上、最多 3 条；“要闻速览”为 8.5 分及以上且低于 9.5 分、最多 6 条。每条摘要要求 80–120 字，无符合条件的内容时显示相应提示。
+
+## 系统架构
 
 ```mermaid
-flowchart LR
-    U["用户浏览器"] --> F["GitHub Pages 前端"]
-    F --> P["Cloudflare Pages API 代理"]
-    P --> C["Coze 工作流"]
-    C --> P --> F
+flowchart TD
+    S["RSS 仓库：GitHub Actions 采集"] --> R["GitHub Pages：feed.xml"]
+    U["用户浏览器"] --> F["本仓库：React / GitHub Pages"]
+    F --> W["Cloudflare Worker：ai-news-service"]
+    T["Cloudflare Cron：北京时间 12:00"] --> W
+    W --> R
+    W --> L["DeepSeek Flash：筛选、摘要、追问"]
+    W <--> D["Durable Object：日报缓存、限流、发送状态"]
+    W --> B["飞书机器人：每日新闻卡片"]
 ```
 
-- React 前端部署在 GitHub Pages，并由 GitHub Actions 自动构建。
-- 前端只访问 Cloudflare Pages 代理，不直接携带 Coze Token。
-- `COZE_API_TOKEN` 作为 Cloudflare 加密 Secret 保存，不会进入仓库或公开的 JavaScript 构建产物。
-- 代理限制允许的来源、工作流和请求体大小，降低公开接口被滥用的风险。
+| 部分 | 代码托管 | 部署与职责 |
+| --- | --- | --- |
+| 网页前端 | 本仓库 `src/` | GitHub Pages 托管静态页面，处理聊天交互与历史记录 |
+| 新闻采集 | [`aibase_news_rss`](https://github.com/Yhao-L/aibase_news_rss) | GitHub Actions 运行采集，GitHub Pages 发布 RSS |
+| 新闻 API 与定时推送 | [`aibase_news_rss/worker/`](https://github.com/Yhao-L/aibase_news_rss/tree/main/worker) | Cloudflare Workers 执行模型调用、日报生成和飞书发送 |
+| 服务状态与密钥 | Cloudflare | Durable Object 保存业务状态，Secrets 保存密钥 |
+
+GitHub 保存源码；GitHub Pages 和 Cloudflare 分别承载前端与后端运行。后端代码更新需要单独部署 Worker，前端提交不会自动部署后端。
 
 ## 技术栈
 
-- React 18、React Context API
-- Tailwind CSS、Lucide React
-- Axios、React Markdown
-- Cloudflare Pages Advanced Mode
-- GitHub Actions、GitHub Pages
-- Coze 工作流 API
+- **前端**：React 18、Context API、Tailwind CSS、Lucide React、Axios、React Markdown。
+- **后端**：Cloudflare Workers、SQLite Durable Objects、Cron Triggers、fast-xml-parser。
+- **模型与投递**：DeepSeek API（`deepseek-flash`）、飞书自定义机器人 Webhook。
+- **发布**：GitHub Actions、GitHub Pages、Wrangler。
 
-## 快速开始
+## 本地运行
 
-### 环境要求
+使用 Node.js 22 或更新版本，可同时运行前端与后端工具链。
 
-- Node.js 18 或更高版本
-- npm
-
-### 本地运行
+### 前端
 
 ```bash
 git clone https://github.com/Yhao-L/ai-news-assistant.git
 cd ai-news-assistant
-npm install
+npm ci
 npm start
 ```
 
-浏览器访问 [http://localhost:3000](http://localhost:3000)。默认配置会使用已经部署的 Cloudflare Pages 代理。
+访问 [http://localhost:3000](http://localhost:3000)。默认连接已部署的生产服务，发送消息可能产生真实模型调用，并受服务限流约束。
 
-### 生产构建
+本地联调时，在项目根目录创建 `.env.local`：
+
+```dotenv
+REACT_APP_API_BASE_URL=http://localhost:8787
+```
+
+变量填写 **Worker 根地址**，不附加 `/api/chat` 或旧 Coze 接口路径。修改后重启开发服务；生产环境需要重新构建前端。
+
+### 后端联调
+
+在另一个终端中运行：
 
 ```bash
+git clone https://github.com/Yhao-L/aibase_news_rss.git
+cd aibase_news_rss/worker
+npm ci
+```
+
+在 `worker/` 目录创建被 Git 忽略的 `.dev.vars`，按以下格式填写本地配置；需要测试真实推送时再填写 `FEISHU_WEBHOOK`：
+
+```dotenv
+DEEPSEEK_API_KEY=替换为你的密钥
+ADMIN_TOKEN=替换为自定义管理令牌
+# FEISHU_WEBHOOK=需要真实发送时填写机器人地址
+```
+
+随后启动：
+
+```bash
+npm run dev
+```
+
+具体配置与真实接口测试方法见[后端 README](https://github.com/Yhao-L/aibase_news_rss/tree/main/worker)。本地配置与 Cloudflare 生产 Secrets 独立。
+
+### 检查与构建
+
+```bash
+# 前端项目内
+CI=true npm test -- --watchAll=false --runInBand
 npm run build
+
+# aibase_news_rss/worker 目录内
+npm test
+npm run check
 ```
 
-构建产物会生成在 `build/` 目录。
+前端产物位于 `build/`。2026-11-06 迁移验收时，2 项前端测试、17 项后端测试及构建通过，并完成线上日报、上下文追问、真实飞书发送和同日发送去重验证。定时配置已启用；手动联调结果不代表已验证后续每次定时执行。
 
-## 配置说明
+## API 概览
 
-如需连接自己的代理，可在本地环境变量中配置：
+生产服务根地址：`https://ai-news-service.sky1342866713.workers.dev`。
 
-```bash
-REACT_APP_API_BASE_URL=https://your-proxy.example.com/v1/workflows/chat
+| 方法与路径 | 作用 |
+| --- | --- |
+| `GET /health` | 检查服务及密钥配置是否存在，不等同于验证模型鉴权 |
+| `POST /api/chat` | 新闻查询与上下文对话，返回 `{ "content": "..." }` |
+| `GET /api/digests/today` | 读取已生成的当日日报，不触发模型生成 |
+| `POST /api/admin/preview` | 生成或读取日报，不发送飞书 |
+| `POST /api/admin/send` | 生成或读取日报并发送飞书 |
+| `GET /api/admin/status` | 查看当日日报与投递状态 |
+
+对话请求示例：
+
+```json
+{
+  "message": "第一条新闻中的技术有什么用途？",
+  "history": [
+    { "role": "user", "content": "今天有什么重要 AI 新闻？" },
+    { "role": "assistant", "content": "此前返回的新闻内容" }
+  ]
+}
 ```
 
-`REACT_APP_*` 变量会被编译进公开前端，因此不能用于存放 Token。Coze Token 应配置为 Cloudflare Pages 项目中的加密 Secret：
+管理接口要求 `Authorization: Bearer <ADMIN_TOKEN>`，仅供后端运维使用。当前公开对话默认限制每 IP 每小时 10 次、全站每天 200 次；CORS 来源限制不替代身份认证。
 
-```text
-COZE_API_TOKEN
-```
+## 部署与密钥维护
 
-更新方法请参阅 [Token 更新指南](./Token更新指南.md)。
+### 前端发布
+
+推送到本仓库 `main` 后，GitHub Actions 自动安装依赖、构建并更新 `gh-pages` 分支，再由 GitHub Pages 发布。
+
+部署自己的副本时，需要同步修改 `package.json` 中的 `homepage`、前端 API 根地址，以及后端 `ALLOWED_ORIGINS` 中的网页来源。
+
+### 后端与定时任务
+
+在 RSS 仓库的 `worker/` 内使用 Wrangler 部署，并配置所需 Secrets。定时表达式为 `0 4 * * *`（UTC），对应北京时间每天 12:00。RSS 采集应提前完成，GitHub Actions 的实际启动时间可能延迟。
+
+### 更换 DeepSeek 密钥
+
+在 Cloudflare 控制台打开：
+
+**Workers & Pages → ai-news-service → Settings → Variables and Secrets → DEEPSEEK_API_KEY**
+
+更新 Secret 并保存、部署。飞书地址和管理令牌在同处维护，名称分别为 `FEISHU_WEBHOOK`、`ADMIN_TOKEN`。无需重新上传旧 `pages-proxy` 或重新发布前端。
+
+`REACT_APP_*` 会编译进公开网页，只能存放非敏感配置。不要把 API Key、Webhook 或管理令牌写入前端、README 或 Git 提交。
+
+## 运行边界
+
+- 当前新闻来源为 AIbase RSS；模型回答受新闻材料、更新频率和模型能力限制，关键结论应回看原文。
+- 日报首次生成后当天复用；同日 RSS 后续更新不会自动重写已有日报。
+- RSS 超过 36 小时未更新、网络失败或模型失败会报错，不会被当作“今日无新闻”。
+- 飞书发送响应不确定时不自动重试，以避免重复投递；需要核对群消息和管理接口中的状态。
+- 历史对话保存在当前浏览器的 localStorage 中，没有账号同步功能；清除浏览器数据会丢失历史记录。请求时会把近期对话发送至后端用于模型回答。
 
 ## 项目结构
 
 ```text
 ai-news-assistant/
-├── .github/workflows/       # GitHub Pages 自动部署
-├── pages-proxy/             # Cloudflare Pages API 代理
+├── .github/workflows/       # 前端自动构建与发布
 ├── public/                  # HTML 模板与静态资源
 ├── src/
-│   ├── components/          # 对话、播客、每日推送等界面
-│   ├── config/              # API 与工作流配置
-│   ├── contexts/            # React 状态管理
-│   ├── services/            # API 请求与 SSE 响应解析
+│   ├── components/          # 当前对话界面；保留部分历史组件
+│   ├── config/              # 公开 API 根地址
+│   ├── contexts/            # 对话状态与本地历史记录
+│   ├── services/            # 新闻 API 请求与测试
 │   ├── theme/               # 主题配置
-│   └── utils/               # 数据迁移与错误处理
-├── config-checker.js        # 代理和工作流配置检查
+│   └── utils/               # 历史数据迁移与错误处理
+├── DEEPSEEK-MIGRATION.md    # 迁移与验收记录
+├── pages-proxy/             # 历史 Coze Pages 代理，当前前端不使用
+├── scheduled-worker/        # 历史 Coze 定时服务，Cron 已关闭
 └── package.json
 ```
 
-## 部署
+旧版播客演示、Coze Token 更新指南和 Pages 代理部署文档反映历史实现，不适用于当前版本。当前部署以本 README 和[新后端说明](https://github.com/Yhao-L/aibase_news_rss/tree/main/worker)为准；迁移细节见 [DEEPSEEK-MIGRATION.md](./DEEPSEEK-MIGRATION.md)。
 
-推送到 `main` 分支后，GitHub Actions 会自动完成安装、构建并发布到 `gh-pages` 分支。
-
-```bash
-git push origin main
-```
-
-相关文档：
-
-- [部署指南](./部署指南.md)
-- [Token 更新指南](./Token更新指南.md)
-- [Cloudflare Pages 代理说明](./pages-proxy/README.md)
-- [项目文件说明](./项目文件说明.md)
-
-## AI 协作记录
-
-<details>
-<summary>查看项目创建、后端构建、调试与部署过程</summary>
-
-### 创建前端
-
-<img width="595" alt="创建前端协作记录" src="https://github.com/user-attachments/assets/4729d4eb-0ec4-4e12-b79d-c7e3a2078112" />
-
-### 构建后端
-
-<img width="313" alt="构建后端协作记录" src="https://github.com/user-attachments/assets/aff5c93e-09e2-4880-87fd-273ab73d9300" />
-
-### 调试
-
-<img width="334" alt="调试协作记录" src="https://github.com/user-attachments/assets/adf598c5-c13e-4f2c-b473-6153177cd440" />
-
-### 提交部署
-
-<img width="609" alt="提交部署协作记录" src="https://github.com/user-attachments/assets/8349abfb-166b-4659-8d67-618bc952eba3" />
-
-</details>
-
-## 贡献
+## 贡献与许可证
 
 欢迎通过 [Issues](https://github.com/Yhao-L/ai-news-assistant/issues) 提交问题或建议，也欢迎创建 Pull Request。
-
-## 许可证
 
 本项目采用 [MIT License](LICENSE)。
