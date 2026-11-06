@@ -186,10 +186,12 @@ const ChatInterface = () => {
                           <div className="text-sm leading-relaxed">
                             <ReactMarkdown
                               components={{
-                                p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+                                p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed whitespace-pre-line">{children}</p>,
                                 h1: ({ children }) => <h1 className="text-lg font-bold mb-3 text-gray-900">{children}</h1>,
                                 h2: ({ children }) => <h2 className="text-base font-semibold mb-2 text-gray-900">{children}</h2>,
                                 h3: ({ children }) => <h3 className="text-sm font-medium mb-2 text-gray-900">{children}</h3>,
+                                h4: ({ children }) => <h4 className="text-base font-semibold my-4 text-gray-900">{children}</h4>,
+                                hr: () => <hr className="my-4 border-gray-200" />,
                                 ul: ({ children }) => <ul className="list-disc list-inside mb-3 space-y-1 text-gray-700">{children}</ul>,
                                 ol: ({ children }) => <ol className="list-decimal list-inside mb-3 space-y-1 text-gray-700">{children}</ol>,
                                 li: ({ children }) => <li className="text-sm leading-relaxed">{children}</li>,
