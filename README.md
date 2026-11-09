@@ -30,7 +30,7 @@ AI 新闻更新频繁，逐条阅读和判断价值需要时间。本项目把�
 
 ## 核心能力
 
-- **全文新闻处理**：从 [AIbase RSS](https://yhao-l.github.io/aibase_news_rss/feed.xml) 读取完整正文，过滤最近 24 小时文章并去重。
+- **全文新闻处理**：从 [AIbase RSS](https://ai-news-service.sky1342866713.workers.dev/feed.xml) 读取完整正文，过滤最近 24 小时文章并去重。
 - **分级筛选与总结**：按配置的提示词筛选技术进展、模型发布及应用等资讯，输出“高优关注”和“要闻速览”，保留原文链接与推荐指数。
 - **输出校验**：检查链接来源、重复条目、分数分组、条数及摘要长度；格式不合格时最多修订两次，仍不合格则报错。
 - **上下文追问**：结合新闻材料与近期对话回答问题；支持 Markdown、对话切换与浏览器本地历史记录。
@@ -43,7 +43,7 @@ AI 新闻更新频繁，逐条阅读和判断价值需要时间。本项目把�
 
 ```mermaid
 flowchart TD
-    S["RSS 仓库：GitHub Actions 采集"] --> R["GitHub Pages：feed.xml"]
+    S["Cloudflare Cron：11:30 采集"] --> R["Cloudflare：全文存储与 feed.xml"]
     U["用户浏览器"] --> F["本仓库：React / GitHub Pages"]
     F --> W["Cloudflare Worker：ai-news-service"]
     T["Cloudflare Cron：北京时间 12:00"] --> W
@@ -56,7 +56,7 @@ flowchart TD
 | 部分 | 代码托管 | 部署与职责 |
 | --- | --- | --- |
 | 网页前端 | 本仓库 `src/` | GitHub Pages 托管静态页面，处理聊天交互与历史记录 |
-| 新闻采集 | [`aibase_news_rss`](https://github.com/Yhao-L/aibase_news_rss) | GitHub Actions 运行采集，GitHub Pages 发布 RSS |
+| 新闻采集 | [`aibase_news_rss`](https://github.com/Yhao-L/aibase_news_rss) | Cloudflare 每天11:30采集，持久保存全文并提供 RSS |
 | 新闻 API 与定时推送 | [`aibase_news_rss/worker/`](https://github.com/Yhao-L/aibase_news_rss/tree/main/worker) | Cloudflare Workers 执行模型调用、日报生成和飞书发送 |
 | 服务状态与密钥 | Cloudflare | Durable Object 保存业务状态，Secrets 保存密钥 |
 
@@ -169,7 +169,7 @@ npm run check
 
 ### 后端与定时任务
 
-在 RSS 仓库的 `worker/` 内使用 Wrangler 部署，并配置所需 Secrets。定时表达式为 `0 4 * * *`（UTC），对应北京时间每天 12:00。RSS 采集应提前完成，GitHub Actions 的实际启动时间可能延迟。
+在 RSS 仓库的 `worker/` 内使用 Wrangler 部署，并配置所需 Secrets。采集定时表达式为 `30 3 * * *`（UTC），对应北京时间每天11:30；推送保持 `0 4 * * *`，即12:00。采集分步保存进度并有限重试，新 RSS 完整生成后才替换旧快照。采集与推送不再依赖 GitHub Actions，前端仍使用 GitHub Pages。
 
 ### 更换 DeepSeek 密钥
 
